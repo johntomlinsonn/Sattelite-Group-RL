@@ -110,7 +110,7 @@ This project is under initial development and not yet open for contributions. On
 
 ## License
 
-To be determined. Will likely adopt an open-source license appropriate for academic and educational use.
+This project is released under the MIT License. See the LICENSE file in the repository for full terms and conditions.
 
 ## Contact
 
