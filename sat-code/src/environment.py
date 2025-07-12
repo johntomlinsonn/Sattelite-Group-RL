@@ -47,8 +47,7 @@ class SatelliteSwarmEnv(gymnasium.Env):
             new_y = max(0, min(self.grid_height - 1, y + vy))
             sat.position = (new_x, new_y)
             for sat in self.satellites:
-                sat.randomizeVelocity()
-            print(earth.calculate_coverage())
+                print(earth.calculate_coverage())
     
 class SatelliteRenderer:
     def __init__(self, env, width=800, height=800):
