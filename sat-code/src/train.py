@@ -95,7 +95,7 @@ def train_maddpg(
     for episode in range(1, n_episodes+1):
         # Reset environment
         states, _ = env.reset()  # Using gymnasium API
-        states = np.array(states).flatten()  # Flatten state for processing
+        # No need to flatten states - environment now returns flattened observations
         
         episode_rewards = np.zeros(num_agents)
         
@@ -105,7 +105,7 @@ def train_maddpg(
             
             # Take actions in the environment
             next_states, rewards, dones, _, _ = env.step(actions)  # Using gymnasium API
-            next_states = np.array(next_states).flatten()
+            # No need to flatten next_states - environment now returns flattened observations
             
             # Store the experience
             maddpg.step(states, actions, rewards, next_states, dones)

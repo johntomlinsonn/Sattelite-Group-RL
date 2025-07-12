@@ -109,27 +109,27 @@ class MADDPGVisualizer:
         
         # Draw title
         title = self.title_font.render("Training Progress", True, (0, 0, 0))
-        self.screen.blit(title, (self.sim_width + 20, 20))
+        self.screen.blit(title, (int(self.sim_width + 20), 20))
         
         # Draw episode info
         episode_text = self.font.render(f"Episode: {self.episode_counter}", True, (0, 0, 0))
-        self.screen.blit(episode_text, (self.sim_width + 20, 60))
+        self.screen.blit(episode_text, (int(self.sim_width + 20), 60))
         
         # Draw score info
         current_score_text = self.font.render(f"Current Score: {self.current_score:.2f}", True, (0, 0, 0))
-        self.screen.blit(current_score_text, (self.sim_width + 20, 80))
+        self.screen.blit(current_score_text, (int(self.sim_width + 20), 80))
         
         best_score_text = self.font.render(f"Best Score: {self.best_score:.2f}", True, (0, 0, 0))
-        self.screen.blit(best_score_text, (self.sim_width + 20, 100))
+        self.screen.blit(best_score_text, (int(self.sim_width + 20), 100))
         
         # Draw exploration info
         noise_text = self.font.render(f"Exploration Noise: {self.noise_scale:.2f}", True, (0, 0, 0))
-        self.screen.blit(noise_text, (self.sim_width + 20, 120))
+        self.screen.blit(noise_text, (int(self.sim_width + 20), 120))
         
         # Calculate elapsed time
         elapsed = time.time() - self.start_time
         elapsed_text = self.font.render(f"Episode Time: {elapsed:.1f}s", True, (0, 0, 0))
-        self.screen.blit(elapsed_text, (self.sim_width + 20, 140))
+        self.screen.blit(elapsed_text, (int(self.sim_width + 20), 140))
         
         # Draw score chart if we have data
         if len(self.episode_scores) > 1:
@@ -150,7 +150,7 @@ class MADDPGVisualizer:
             self.canvas.draw()
             buf = self.canvas.buffer_rgba()
             chart_surface = pygame.image.frombuffer(buf, (int(self.chart_width * 0.9), int(self.chart_height * 0.4)), "RGBA")
-            self.screen.blit(chart_surface, (self.sim_width + 20, 180))
+            self.screen.blit(chart_surface, (int(self.sim_width + 20), 180))
     
     def draw_environment(self):
         """Draw the satellite environment."""
@@ -175,21 +175,21 @@ class MADDPGVisualizer:
         
         # Draw grid (optional, for visual reference)
         for i in range(0, grid_width + 1, max(1, grid_width // 10)):
-            x = 50 + i * scale_x
+            x = int(50 + i * scale_x)
             pygame.draw.line(
                 self.screen, 
                 (220, 220, 220), 
                 (x, 50), 
-                (x, 50 + grid_height * scale_y)
+                (x, int(50 + grid_height * scale_y))
             )
             
         for j in range(0, grid_height + 1, max(1, grid_height // 10)):
-            y = 50 + j * scale_y
+            y = int(50 + j * scale_y)
             pygame.draw.line(
                 self.screen, 
                 (220, 220, 220), 
                 (50, y), 
-                (50 + grid_width * scale_x, y)
+                (int(50 + grid_width * scale_x), y)
             )
             
         # Draw satellites and coverage
@@ -198,31 +198,31 @@ class MADDPGVisualizer:
             vx, vy = sat.velocity
             
             # Convert grid to screen coordinates
-            sx = 50 + x * scale_x
-            sy = 50 + y * scale_y
+            sx = int(50 + x * scale_x)
+            sy = int(50 + y * scale_y)
             
             # Draw coverage circle (semi-transparent)
             coverage_px = int(self.env.coverage_radius * scale_x)
-            coverage_circle = pygame.Surface((coverage_px*2, coverage_px*2), pygame.SRCALPHA)
-            pygame.draw.circle(coverage_circle, (0, 0, 255, 50), (coverage_px, coverage_px), coverage_px)
-            self.screen.blit(coverage_circle, (sx - coverage_px, sy - coverage_px))
+            
+            # Draw coverage circle directly on screen (no transparency)
+            pygame.draw.circle(self.screen, (200, 200, 255), (sx, sy), coverage_px)
             
             # Draw satellite
-            pygame.draw.circle(self.screen, (255, 0, 0), (int(sx), int(sy)), 5)
+            pygame.draw.circle(self.screen, (255, 0, 0), (sx, sy), 5)
             
             # Draw velocity vector
             pygame.draw.line(
                 self.screen,
                 (0, 200, 0),
                 (sx, sy),
-                (sx + vx * 5, sy + vy * 5),
+                (int(sx + vx * 5), int(sy + vy * 5)),
                 2
             )
             
         # Draw coverage percentage
         coverage = self.env.calculate_coverage() * 100
         coverage_text = self.font.render(f"Earth Coverage: {coverage:.1f}%", True, (0, 0, 0))
-        self.screen.blit(coverage_text, (50, self.sim_height - 30))
+        self.screen.blit(coverage_text, (50, int(self.sim_height - 30)))
         
     def update(self):
         """Update the visualization."""

@@ -33,21 +33,14 @@ class SatelliteSwarmEnv(gym.Env):
             dtype=np.float32
         )
 
-        # Observations: position, velocity, and communication status for each satellite
-        self.observation_space = gym.spaces.Dict({
-            'positions': gym.spaces.Box(
-                low=0, 
-                high=grid_size, 
-                shape=(num_satellites, 2), 
-                dtype=np.float32
-            ),
-            'velocities': gym.spaces.Box(
-                low=-10,
-                high=10,
-                shape=(num_satellites, 2),
-                dtype=np.float32
-            )
-        })
+        # Observations: flattened array containing positions and velocities
+        # Format: [pos_x1, pos_y1, vel_x1, vel_y1, pos_x2, pos_y2, vel_x2, vel_y2, ...]
+        self.observation_space = gym.spaces.Box(
+            low=np.array([0, 0, -10, -10] * num_satellites),
+            high=np.array([grid_size, grid_size, 10, 10] * num_satellites),
+            shape=(num_satellites * 4,),
+            dtype=np.float32
+        )
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -60,13 +53,13 @@ class SatelliteSwarmEnv(gym.Env):
         return self._get_observation(), {}
 
     def _get_observation(self):
-        positions = np.array([sat.getPosition() for sat in self.satellites])
-        velocities = np.array([sat.velocity for sat in self.satellites])
-        
-        return {
-            'positions': positions.astype(np.float32),
-            'velocities': velocities.astype(np.float32)
-        }
+        """Return a flattened array of all satellite positions and velocities."""
+        observation = []
+        for sat in self.satellites:
+            x, y = sat.getPosition()
+            vx, vy = sat.velocity
+            observation.extend([x, y, vx, vy])
+        return np.array(observation, dtype=np.float32)
 
     def calculate_coverage(self):
         """Calculate the percentage of Earth grid covered by satellites."""
@@ -136,9 +129,9 @@ class SatelliteRenderer:
         self.screen.fill((255, 255, 255))
         # Draw grid (optional)
         for i in range(0, self.width, self.width // self.grid_width):
-            pygame.draw.line(self.screen, (220,220,220), (i,0), (i,self.height))
+            pygame.draw.line(self.screen, (220,220,220), (int(i),0), (int(i),self.height))
         for j in range(0, self.height, self.height // self.grid_height):
-            pygame.draw.line(self.screen, (220,220,220), (0,j), (self.width,j))
+            pygame.draw.line(self.screen, (220,220,220), (0,int(j)), (self.width,int(j)))
         # Draw satellites and coverage
         for sat in self.env.satellites:
             x, y = sat.getPosition()
@@ -150,12 +143,23 @@ class SatelliteRenderer:
         pygame.display.flip()
 
     def run(self, steps=500, fps=30):
+        """
+        Run the visualization for a specified number of steps with random actions.
+        
+        Args:
+            steps: Number of steps to run
+            fps: Frames per second for visualization
+        """
         for _ in range(steps):
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
-            self.env.step()
+            
+            # Generate random actions for all satellites
+            random_actions = np.random.uniform(-1, 1, size=(self.env.num_satellites, 2))
+            self.env.step(random_actions)
+            
             self.draw()
             self.clock.tick(fps)
     
@@ -180,8 +184,3 @@ class Sat:
     def getPosition(self):
         return self.position
     
-    
-earth = SatelliteSwarmEnv(num_satellites=10, grid_size=100, max_timesteps=200, coverage_radius=10)
-print(earth.calculate_coverage())
-renderer = SatelliteRenderer(earth)
-renderer.run(steps=500, fps=2)
