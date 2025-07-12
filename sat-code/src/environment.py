@@ -173,7 +173,7 @@ class Sat:
 
     def reset(self):
         self.position = (rand.randint(0,self.grid_x_), rand.randint(0,self.grid_y_))
-        self.velocity = (rand.randint(-10,10), rand.randint(-10,10))
+        self.velocity = (0, 0)
 
     def updateVelocity(self, velocity_x, velocity_y):
         self.velocity = (velocity_x, velocity_y)
