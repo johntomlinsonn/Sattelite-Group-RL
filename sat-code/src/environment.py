@@ -102,6 +102,57 @@ class SatelliteSwarmEnv(gym.Env):
         total_reward = coverage_reward + boundary_penalty
         return total_reward
 
+    def _calculate_per_agent_rewards(self):
+        """Calculate individual rewards for each satellite based on their performance."""
+        rewards = []
+        
+        for i, sat in enumerate(self.satellites):
+            # Individual coverage contribution
+            individual_coverage = 0
+            x, y = sat.getPosition()
+            
+            # Count coverage points this satellite is responsible for
+            for gx in range(max(0, int(x - self.coverage_radius)), 
+                          min(self.grid_width, int(x + self.coverage_radius + 1))):
+                for gy in range(max(0, int(y - self.coverage_radius)), 
+                              min(self.grid_height, int(y + self.coverage_radius + 1))):
+                    distance = np.sqrt((gx - x)**2 + (gy - y)**2)
+                    if distance <= self.coverage_radius:
+                        individual_coverage += 1
+            
+            # Normalize by total possible coverage
+            max_coverage = np.pi * self.coverage_radius**2
+            coverage_reward = individual_coverage / max_coverage
+            
+            # Individual boundary penalty
+            boundary_penalty = 0.0
+            boundary_margin = 5
+            
+            dist_to_left = x
+            dist_to_right = self.grid_width - 1 - x
+            dist_to_top = y
+            dist_to_bottom = self.grid_height - 1 - y
+            min_dist_to_boundary = min(dist_to_left, dist_to_right, dist_to_top, dist_to_bottom)
+            
+            if min_dist_to_boundary < boundary_margin:
+                penalty_strength = (boundary_margin - min_dist_to_boundary) / boundary_margin
+                boundary_penalty = -0.1 * penalty_strength
+            
+            # Communication bonus (reward for being connected to other satellites)
+            comm_bonus = 0.0
+            for j, other_sat in enumerate(self.satellites):
+                if i != j:
+                    other_x, other_y = other_sat.getPosition()
+                    distance = np.sqrt((x - other_x)**2 + (y - other_y)**2)
+                    if distance <= self.comm_range:
+                        comm_bonus += 0.05  # Small bonus for each connection
+            
+            # Combine individual rewards
+            total_reward = coverage_reward + boundary_penalty + comm_bonus
+            rewards.append(total_reward)
+        
+        return np.array(rewards)
+
     def step(self, action):
         self.current_step += 1
         
@@ -127,7 +178,12 @@ class SatelliteSwarmEnv(gym.Env):
             sat.position = (new_x, new_y)
         
         # Calculate reward
+        # Choose between global reward or per-agent rewards
+        # For global reward (current behavior):
         reward = self._calculate_reward()
+        
+        # For per-agent rewards, uncomment the line below and comment out the line above:
+        # reward = self._calculate_per_agent_rewards()
         
         # Check if episode is done
         done = self.current_step >= self.max_timesteps
@@ -204,4 +260,4 @@ class Sat:
 
     def getPosition(self):
         return self.position
-    
+
