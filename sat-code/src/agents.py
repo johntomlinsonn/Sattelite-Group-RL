@@ -4,6 +4,42 @@ import torch.nn.functional as F
 import random
 import numpy as np
 
+# Check if CUDA is available and set device
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}")
+if torch.cuda.is_available():
+    print(f"CUDA device: {torch.cuda.get_device_name(0)}")
+    print(f"CUDA memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB")
+
+def get_device_info():
+    """
+    Get information about the current device being used.
+    
+    Returns:
+        dict: Device information including type, name, and memory stats
+    """
+    info = {
+        'device': str(device),
+        'cuda_available': torch.cuda.is_available()
+    }
+    
+    if torch.cuda.is_available():
+        info['device_name'] = torch.cuda.get_device_name(0)
+        info['total_memory'] = torch.cuda.get_device_properties(0).total_memory / 1024**3  # GB
+        info['allocated_memory'] = torch.cuda.memory_allocated(0) / 1024**3  # GB
+        info['cached_memory'] = torch.cuda.memory_reserved(0) / 1024**3  # GB
+        info['free_memory'] = info['total_memory'] - info['allocated_memory']
+    
+    return info
+
+def print_gpu_memory_usage():
+    """Print current GPU memory usage if CUDA is available."""
+    if torch.cuda.is_available():
+        allocated = torch.cuda.memory_allocated(0) / 1024**3
+        cached = torch.cuda.memory_reserved(0) / 1024**3
+        total = torch.cuda.get_device_properties(0).total_memory / 1024**3
+        print(f"GPU Memory - Allocated: {allocated:.2f}GB, Cached: {cached:.2f}GB, Total: {total:.2f}GB")
+
 class Actor(nn.Module):
     """
     Actor (Policy) Network for MADDPG.
@@ -95,15 +131,16 @@ class MADDPGAgent:
         self.agent_id = agent_id
         self.gamma = gamma  # Discount factor
         self.tau = tau      # Soft update parameter
+        self.device = device  # Use the global device
         
         # Actor Networks - Each actor takes only its own state and outputs its own action
-        self.actor = Actor(state_size, action_size)
-        self.actor_target = Actor(state_size, action_size)
+        self.actor = Actor(state_size, action_size).to(self.device)
+        self.actor_target = Actor(state_size, action_size).to(self.device)
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=1e-4)
         
         # Critic Networks - Each critic takes the state and actions of all agents
-        self.critic = Critic(state_size, action_size, num_agents)
-        self.critic_target = Critic(state_size, action_size, num_agents)
+        self.critic = Critic(state_size, action_size, num_agents).to(self.device)
+        self.critic_target = Critic(state_size, action_size, num_agents).to(self.device)
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=1e-3)
         
         # Copy weights
@@ -120,6 +157,14 @@ class MADDPGAgent:
             agent_id: Index of this agent
         """
         states, actions, rewards, next_states, dones = experiences
+        
+        # Move tensors to device if they're not already
+        states = states.to(self.device)
+        actions = actions.to(self.device)
+        rewards = rewards.to(self.device)
+        next_states = next_states.to(self.device)
+        dones = dones.to(self.device)
+        next_actions = next_actions.to(self.device)
         
         # Agent-specific reward and done
         agent_rewards = rewards[:, agent_id].unsqueeze(-1)
@@ -192,6 +237,9 @@ class MADDPGAgent:
         if not isinstance(state, torch.Tensor):
             state = torch.from_numpy(state).float()
         
+        # Move to device
+        state = state.to(self.device)
+        
         # Make sure state has batch dimension
         if state.dim() == 1:
             state = state.unsqueeze(0)
@@ -199,7 +247,7 @@ class MADDPGAgent:
         # Get action from policy network
         self.actor.eval()
         with torch.no_grad():
-            action = self.actor(state).cpu().numpy()
+            action = self.actor(state).cpu().numpy()  # Move back to CPU for numpy conversion
         self.actor.train()
         
         # Add noise for exploration
@@ -288,7 +336,7 @@ class ReplayBuffer:
         experiences = [self.memory[i] for i in indices]
         
         # Convert to tensors - handle each component carefully
-        states = torch.from_numpy(np.vstack([e[0] for e in experiences])).float()
+        states = torch.from_numpy(np.vstack([e[0] for e in experiences])).float().to(device)
         
         # For actions, ensure proper shape (batch_size, num_agents * action_size)
         actions_data = []
@@ -300,11 +348,11 @@ class ReplayBuffer:
             actions_data.append(action)
         
         # Stack to create (batch_size, num_agents * action_size)
-        actions = torch.from_numpy(np.array(actions_data)).float()
+        actions = torch.from_numpy(np.array(actions_data)).float().to(device)
         
-        rewards = torch.from_numpy(np.vstack([e[2] for e in experiences])).float()
-        next_states = torch.from_numpy(np.vstack([e[3] for e in experiences])).float()
-        dones = torch.from_numpy(np.vstack([e[4] for e in experiences]).astype(np.uint8)).float()
+        rewards = torch.from_numpy(np.vstack([e[2] for e in experiences])).float().to(device)
+        next_states = torch.from_numpy(np.vstack([e[3] for e in experiences])).float().to(device)
+        dones = torch.from_numpy(np.vstack([e[4] for e in experiences]).astype(np.uint8)).float().to(device)
         
         # Print shapes for debugging (only when there's an issue)
         # print(f"ReplayBuffer sample - states shape: {states.shape}, actions shape: {actions.shape}")
@@ -340,6 +388,7 @@ class MADDPG:
         self.gamma = gamma
         self.tau = tau
         self.batch_size = batch_size
+        self.device = device  # Use the global device
         
         # Create multiple agents
         self.agents = [MADDPGAgent(state_size, action_size, num_agents, i, gamma, tau) 
@@ -365,9 +414,9 @@ class MADDPG:
         
         # Convert states to tensor if it's a numpy array
         if isinstance(states, np.ndarray):
-            states_tensor = torch.from_numpy(states).float()
+            states_tensor = torch.from_numpy(states).float().to(self.device)
         else:
-            states_tensor = states
+            states_tensor = states.to(self.device)
             
         # Make sure it's the right shape
         if states_tensor.dim() == 1:
@@ -467,7 +516,7 @@ class MADDPG:
         batch_size = states.shape[0]
         
         # Create a tensor to hold next actions from all agents
-        next_actions = torch.zeros(batch_size, self.num_agents * self.action_size, device=states.device)
+        next_actions = torch.zeros(batch_size, self.num_agents * self.action_size, device=self.device)
         
         # Get next actions for each agent
         for i, agent in enumerate(self.agents):
@@ -513,7 +562,7 @@ class MADDPG:
             directory: Directory to load the models from
         """
         for i, agent in enumerate(self.agents):
-            agent.actor.load_state_dict(torch.load(f"{directory}/actor_agent_{i}.pth"))
-            agent.critic.load_state_dict(torch.load(f"{directory}/critic_agent_{i}.pth"))
-            agent.actor_target.load_state_dict(torch.load(f"{directory}/actor_agent_{i}.pth"))
-            agent.critic_target.load_state_dict(torch.load(f"{directory}/critic_agent_{i}.pth"))
+            agent.actor.load_state_dict(torch.load(f"{directory}/actor_agent_{i}.pth", map_location=self.device))
+            agent.critic.load_state_dict(torch.load(f"{directory}/critic_agent_{i}.pth", map_location=self.device))
+            agent.actor_target.load_state_dict(torch.load(f"{directory}/actor_agent_{i}.pth", map_location=self.device))
+            agent.critic_target.load_state_dict(torch.load(f"{directory}/critic_agent_{i}.pth", map_location=self.device))

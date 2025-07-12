@@ -6,7 +6,7 @@ import os
 import time
 
 from src.environment import SatelliteSwarmEnv
-from src.agents import MADDPG
+from src.agents import MADDPG, get_device_info, print_gpu_memory_usage
 from src.maddpg import create_visualizer
 
 def train_maddpg(
@@ -69,6 +69,14 @@ def train_maddpg(
         gamma=gamma,
         tau=tau
     )
+    
+    # Print device information
+    device_info = get_device_info()
+    print(f"Training on device: {device_info['device']}")
+    if device_info['cuda_available']:
+        print(f"GPU: {device_info['device_name']}")
+        print(f"Total GPU Memory: {device_info['total_memory']:.2f} GB")
+        print_gpu_memory_usage()
     
     # Initialize score tracking
     scores = []
@@ -145,6 +153,10 @@ def train_maddpg(
             elapsed = time.time() - start_time
             avg_score = np.mean(scores_window[-print_every:])
             print(f"Episode {episode}/{n_episodes} | Avg Score: {avg_score:.2f} | Noise: {noise_scale:.2f} | Time: {elapsed:.1f}s")
+            
+            # Print GPU memory usage if available
+            if device_info['cuda_available']:
+                print_gpu_memory_usage()
             
             # Plot progress
             plt.figure(figsize=(10, 5))
