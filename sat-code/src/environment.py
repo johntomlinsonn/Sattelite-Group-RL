@@ -75,10 +75,31 @@ class SatelliteSwarmEnv(gym.Env):
     def _calculate_reward(self):
         """Calculate the reward based on coverage and communication links."""
         coverage_reward = self.calculate_coverage()
-    
+        
+        # Calculate boundary penalty - negative reward for satellites near edges
+        boundary_penalty = 0.0
+        boundary_margin = 5  # Distance from edge where penalty starts
+        
+        for sat in self.satellites:
+            x, y = sat.getPosition()
+            
+            # Calculate distance to nearest boundary
+            dist_to_left = x
+            dist_to_right = self.grid_width - 1 - x
+            dist_to_top = y
+            dist_to_bottom = self.grid_height - 1 - y
+            
+            # Find minimum distance to any boundary
+            min_dist_to_boundary = min(dist_to_left, dist_to_right, dist_to_top, dist_to_bottom)
+            
+            # Apply penalty if too close to boundary
+            if min_dist_to_boundary < boundary_margin:
+                # Penalty increases as satellite gets closer to edge
+                penalty_strength = (boundary_margin - min_dist_to_boundary) / boundary_margin
+                boundary_penalty -= 0.1 * penalty_strength  # Adjust penalty strength as needed
         
         # Combine rewards with weights
-        total_reward = coverage_reward
+        total_reward = coverage_reward + boundary_penalty
         return total_reward
 
     def step(self, action):
