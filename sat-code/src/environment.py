@@ -1,53 +1,125 @@
-import gymnasium, numpy as np, random as rand
+import gymnasium as gym
+import numpy as np
+import random as rand
 import pygame
 import sys
 
-class SatelliteSwarmEnv(gymnasium.Env):
-    def __init__(self,num_satellites,grid_size,max_timesteps,coverage_radius):
+class SatelliteSwarmEnv(gym.Env):
+    def __init__(self, num_satellites, grid_size, max_timesteps, coverage_radius, comm_range=15):
         super(SatelliteSwarmEnv, self).__init__()
+        # Satellite settings
         self.num_satellites = num_satellites
-        self.max_timesteps = max_timesteps
         self.coverage_radius = coverage_radius
+        self.comm_range = comm_range 
+
+        # Environment state
+        self.current_step = 0
+        self.max_timesteps = max_timesteps
     
+        # Grid settings
         self.grid_width = grid_size
         self.grid_height = grid_size
         self.earth_coverage_map = np.zeros((self.grid_width, self.grid_height), dtype=bool)
 
+        # Initialize satellites
         self.satellites = [Sat(self.grid_width, self.grid_height) for _ in range(num_satellites)]
         
         # Define action and observation spaces
-        self.action_space = gymnasium.spaces.Discrete(num_satellites * 5)
-        self.observation_space = gymnasium.spaces.Box(
-            low=0, 
-            high=grid_size, 
-            shape=(num_satellites, 2), 
+        # Actions: [dx, dy] for each satellite (continuous)
+        self.action_space = gym.spaces.Box(
+            low=-1,
+            high=1,
+            shape=(num_satellites, 2),
             dtype=np.float32
         )
-    def reset(self, *, seed=None, options=None):
-        return super().reset(seed=seed, options=options)
-    
+
+        # Observations: position, velocity, and communication status for each satellite
+        self.observation_space = gym.spaces.Dict({
+            'positions': gym.spaces.Box(
+                low=0, 
+                high=grid_size, 
+                shape=(num_satellites, 2), 
+                dtype=np.float32
+            ),
+            'velocities': gym.spaces.Box(
+                low=-10,
+                high=10,
+                shape=(num_satellites, 2),
+                dtype=np.float32
+            )
+        })
+
+    def reset(self, seed=None, options=None):
+        super().reset(seed=seed)
+        self.current_step = 0
+        
+        # Reset all satellites
+        for sat in self.satellites:
+            sat.reset()
+        
+        return self._get_observation(), {}
+
+    def _get_observation(self):
+        positions = np.array([sat.getPosition() for sat in self.satellites])
+        velocities = np.array([sat.velocity for sat in self.satellites])
+        comm_matrix = self._calculate_communication_matrix()
+        
+        return {
+            'positions': positions.astype(np.float32),
+            'velocities': velocities.astype(np.float32)
+        }
+
     def calculate_coverage(self):
+        """Calculate the percentage of Earth grid covered by satellites."""
         self.earth_coverage_map.fill(False)
         for sat in self.satellites:
             x, y = sat.getPosition()
-            for i in range(max(0, x - self.coverage_radius), min(self.grid_width, x + self.coverage_radius + 1)):
-                for j in range(max(0, y - self.coverage_radius), min(self.grid_height, y + self.coverage_radius + 1)):
+            for i in range(max(0, int(x - self.coverage_radius)), min(self.grid_width, int(x + self.coverage_radius + 1))):
+                for j in range(max(0, int(y - self.coverage_radius)), min(self.grid_height, int(y + self.coverage_radius + 1))):
                     if (i - x) ** 2 + (j - y) ** 2 <= self.coverage_radius ** 2:
                         self.earth_coverage_map[i, j] = True
         return np.sum(self.earth_coverage_map) / (self.grid_width * self.grid_height)
+
+    def _calculate_reward(self):
+        """Calculate the reward based on coverage and communication links."""
+        coverage_reward = self.calculate_coverage()
     
-    def step(self):
-        # Update satellite positions based on their velocities
-        for sat in self.satellites:
-            x, y = sat.getPosition()
-            vx, vy = sat.velocity
         
+        # Combine rewards with weights
+        total_reward = coverage_reward
+        return total_reward
+
+    def step(self, action):
+        self.current_step += 1
+        
+        # Apply actions (accelerations) to satellites
+        for i, sat in enumerate(self.satellites):
+            dx, dy = action[i]
+            current_vx, current_vy = sat.velocity
+            
+            # Update velocity (with some damping to prevent extreme velocities)
+            new_vx = 0.95 * current_vx + dx
+            new_vy = 0.95 * current_vy + dy
+            
+            # Clip velocities
+            new_vx = np.clip(new_vx, -10, 10)
+            new_vy = np.clip(new_vy, -10, 10)
+            
+            sat.updateVelocity(new_vx, new_vy)
+            
             # Update position
-            new_x = max(0, min(self.grid_width - 1, x + vx))
-            new_y = max(0, min(self.grid_height - 1, y + vy))
+            x, y = sat.getPosition()
+            new_x = np.clip(x + new_vx, 0, self.grid_width - 1)
+            new_y = np.clip(y + new_vy, 0, self.grid_height - 1)
             sat.position = (new_x, new_y)
-            for sat in self.satellites:
-                print(earth.calculate_coverage())
+        
+        # Calculate reward
+        reward = self._calculate_reward()
+        
+        # Check if episode is done
+        done = self.current_step >= self.max_timesteps
+        
+        return self._get_observation(), reward, done, False, {}
     
 class SatelliteRenderer:
     def __init__(self, env, width=800, height=800):
