@@ -9,8 +9,10 @@ def main():
     """
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Satellite Swarm RL Training')
-    parser.add_argument('--no-vis', action='store_true', help='Disable visualization')
+    parser.add_argument('--no-vis', action='store_true', help='Disable continuous visualization (still shows every 15 episodes)')
     parser.add_argument('--test-cuda', action='store_true', help='Test CUDA setup and exit')
+    parser.add_argument('--periodic-interval', type=int, default=15, 
+                       help='Show visualization every N episodes when --no-vis is used (default: 15)')
     args = parser.parse_args()
     
     # Test CUDA if requested
@@ -28,10 +30,19 @@ def main():
     if device_info['cuda_available']:
         print(f"GPU: {device_info['device_name']}")
         print(f"GPU Memory: {device_info['total_memory']:.2f} GB")
+    
+    # Show visualization mode info
+    if not args.no_vis:
+        print("Visualization: Continuous (real-time)")
+    else:
+        print(f"Visualization: Periodic (every {args.periodic_interval} episodes)")
     print("=" * 60)
     
     print("Starting training...")
-    train_and_visualize(visualize=not args.no_vis)
+    train_and_visualize(
+        visualize=not args.no_vis, 
+        periodic_vis_interval=args.periodic_interval if args.no_vis else 0
+    )
     print("Training complete!")
 
 if __name__ == "__main__":

@@ -29,7 +29,8 @@ def train_maddpg(
     print_every=10,
     save_every=100,
     visualize=True,
-    visualization_fps=30
+    visualization_fps=30,
+    periodic_vis_interval=15
 ):
     """
     Train MADDPG agents in the given environment.
@@ -53,8 +54,9 @@ def train_maddpg(
         noise_scale_decay: Decay rate for exploration noise
         print_every: How often to print progress
         save_every: How often to save the model
-        visualize: Whether to visualize the training
+        visualize: Whether to visualize the training continuously
         visualization_fps: Frames per second for visualization
+        periodic_vis_interval: Show visualization every N episodes (even when visualize=False)
         
     Returns:
         scores: List of scores from each episode
@@ -89,12 +91,16 @@ def train_maddpg(
     save_dir = f"models/maddpg_{timestamp}"
     os.makedirs(save_dir, exist_ok=True)
     
-    # Set up visualization if enabled
+    # Set up visualization if enabled (or for periodic visualization)
     visualizer = None
-    if visualize:
+    vis_dir = None
+    if visualize or periodic_vis_interval > 0:
         vis_dir = f"visualizations/maddpg_{timestamp}"
         os.makedirs(vis_dir, exist_ok=True)
         visualizer = create_visualizer(env, save_dir=vis_dir)
+        
+        if not visualize:
+            print(f"Periodic visualization enabled: will show every {periodic_vis_interval} episodes")
     
     # Training loop
     print("Starting training...")
@@ -126,9 +132,18 @@ def train_maddpg(
             if np.any(dones):
                 break
                 
-            # Update visualization if enabled
-            if visualizer is not None and step % 5 == 0:  # Update every 5 steps for performance
-                visualizer.update()
+            # Update visualization if enabled (continuous or periodic)
+            should_visualize_step = False
+            if visualizer is not None:
+                if visualize:
+                    # Continuous visualization mode
+                    should_visualize_step = (step % 5 == 0)
+                elif periodic_vis_interval > 0 and episode % periodic_vis_interval == 0:
+                    # Periodic visualization mode - show every step during special episodes
+                    should_visualize_step = True
+                
+                if should_visualize_step:
+                    visualizer.update()
         
         # Decay noise for exploration
         noise_scale = max(noise_scale_end, noise_scale * noise_scale_decay)
@@ -138,21 +153,35 @@ def train_maddpg(
         scores.append(score)
         scores_window.append(score)
         
-        # Update visualization metrics
+        # Update visualization metrics and handle periodic visualization
         if visualizer is not None:
             avg_score = np.mean(scores_window[-min(len(scores_window), 100):])
             visualizer.update_metrics(episode, score, avg_score, noise_scale)
-            visualizer.update()
             
-            # Save screenshot at intervals
-            if episode % save_every == 0 or episode == 1:
+            # Always update metrics, but only update display for continuous or periodic episodes
+            if visualize:
+                # Continuous visualization
+                visualizer.update()
+            elif periodic_vis_interval > 0 and episode % periodic_vis_interval == 0:
+                # Periodic visualization - show this episode
+                print(f"\n--- Periodic Visualization (Episode {episode}) ---")
+                visualizer.update()
+                print("--- End Periodic Visualization ---\n")
+            
+            # Save screenshot at intervals or periodic episodes
+            should_save_screenshot = (
+                (episode % save_every == 0 or episode == 1) or
+                (not visualize and periodic_vis_interval > 0 and episode % periodic_vis_interval == 0)
+            )
+            if should_save_screenshot:
                 visualizer.save_screenshot(episode)
         
         # Print progress
         if episode % print_every == 0:
             elapsed = time.time() - start_time
             avg_score = np.mean(scores_window[-print_every:])
-            print(f"Episode {episode}/{n_episodes} | Avg Score: {avg_score:.2f} | Noise: {noise_scale:.2f} | Time: {elapsed:.1f}s")
+            vis_mode = "continuous" if visualize else f"periodic (every {periodic_vis_interval})"
+            print(f"Episode {episode}/{n_episodes} | Avg Score: {avg_score:.2f} | Noise: {noise_scale:.2f} | Time: {elapsed:.1f}s | Vis: {vis_mode}")
             
             # Print GPU memory usage if available
             if device_info['cuda_available']:
@@ -203,7 +232,7 @@ def train_maddpg(
     
     return scores
 
-def train_and_visualize(visualize=True):
+def train_and_visualize(visualize=True, periodic_vis_interval=15):
     """Main function to set up and run the training process."""
     # Create environment
     num_satellites = 3
@@ -232,7 +261,8 @@ def train_and_visualize(visualize=True):
         max_steps=max_timesteps,
         print_every=10,
         save_every=100,
-        visualize=visualize
+        visualize=visualize,
+        periodic_vis_interval=periodic_vis_interval
     )
     
     return scores
