@@ -2,7 +2,7 @@
 
 ## 1. Project Title
 
-Satellite Swarm Coordination via Deep Reinforcement Learning
+Satellite Swarm Coordination via Deep Reinforcement Learning 2D
 
 ## 2. Introduction and Abstract
 
