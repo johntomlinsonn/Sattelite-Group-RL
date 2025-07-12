@@ -287,27 +287,29 @@ class ReplayBuffer:
         indices = np.random.choice(len(self.memory), batch_size, replace=False)
         experiences = [self.memory[i] for i in indices]
         
-        # Convert to tensors - need to handle actions carefully for multi-agent case
+        # Convert to tensors - handle each component carefully
         states = torch.from_numpy(np.vstack([e[0] for e in experiences])).float()
         
-        # For actions, we need to make sure they're properly flattened
-        actions_list = []
+        # For actions, ensure proper shape (batch_size, num_agents * action_size)
+        actions_data = []
         for e in experiences:
-            action = e[1]  # This should be shape (1, num_agents * action_size)
-            if action.ndim == 2 and action.shape[0] == 1:
-                actions_list.append(action.flatten())  # Flatten to 1D
-            else:
-                actions_list.append(action.flatten())  # Ensure it's flattened
-        actions = torch.from_numpy(np.vstack(actions_list)).float()
+            action = e[1]  # Should be shape (1, num_agents * action_size) or (num_agents * action_size,)
+            if action.ndim == 2:
+                # If it's 2D with batch dimension, take the first (and should be only) row
+                action = action[0]
+            actions_data.append(action)
+        
+        # Stack to create (batch_size, num_agents * action_size)
+        actions = torch.from_numpy(np.array(actions_data)).float()
         
         rewards = torch.from_numpy(np.vstack([e[2] for e in experiences])).float()
         next_states = torch.from_numpy(np.vstack([e[3] for e in experiences])).float()
         dones = torch.from_numpy(np.vstack([e[4] for e in experiences]).astype(np.uint8)).float()
         
-        # Print shapes for debugging
-        print(f"ReplayBuffer sample - states shape: {states.shape}, actions shape: {actions.shape}")
-        print(f"ReplayBuffer sample - rewards shape: {rewards.shape}, next_states shape: {next_states.shape}")
-        print(f"ReplayBuffer sample - dones shape: {dones.shape}")
+        # Print shapes for debugging (only when there's an issue)
+        # print(f"ReplayBuffer sample - states shape: {states.shape}, actions shape: {actions.shape}")
+        # print(f"ReplayBuffer sample - rewards shape: {rewards.shape}, next_states shape: {next_states.shape}")
+        # print(f"ReplayBuffer sample - dones shape: {dones.shape}")
         
         return (states, actions, rewards, next_states, dones)
         
@@ -441,8 +443,8 @@ class MADDPG:
         elif dones.ndim == 1:
             dones = dones.reshape(1, -1)
         
-        # Debug print to check shapes before storing
-        print(f"MADDPG step - storing: states {states.shape}, actions {actions.shape}, rewards {rewards.shape}")
+        # Debug print to check shapes before storing (only when needed)
+        # print(f"MADDPG step - storing: states {states.shape}, actions {actions.shape}, rewards {rewards.shape}")
         
         # Save experience in replay buffer
         self.replay_buffer.add(states, actions, rewards, next_states, dones)

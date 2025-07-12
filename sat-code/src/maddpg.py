@@ -61,7 +61,10 @@ class MADDPGVisualizer:
             os.makedirs(self.save_dir, exist_ok=True)
             
         # Initialize matplotlib figure for metrics
-        self.fig = Figure(figsize=(self.chart_width/100, self.chart_height/200), dpi=100)
+        # Calculate figure size to match expected pygame surface size
+        chart_fig_width = (self.chart_width * 0.9) / 100  # Convert pixels to inches (100 DPI)
+        chart_fig_height = (self.chart_height * 0.4) / 100
+        self.fig = Figure(figsize=(chart_fig_width, chart_fig_height), dpi=100)
         self.ax = self.fig.add_subplot(111)
         self.canvas = FigureCanvas(self.fig)
         
@@ -147,10 +150,26 @@ class MADDPGVisualizer:
             self.ax.grid(True, linestyle='--', alpha=0.7)
             
             # Convert matplotlib figure to pygame surface
-            self.canvas.draw()
-            buf = self.canvas.buffer_rgba()
-            chart_surface = pygame.image.frombuffer(buf, (int(self.chart_width * 0.9), int(self.chart_height * 0.4)), "RGBA")
-            self.screen.blit(chart_surface, (int(self.sim_width + 20), 180))
+            try:
+                self.canvas.draw()
+                buf = self.canvas.buffer_rgba()
+                # Calculate expected buffer size
+                expected_width = int(self.chart_width * 0.9)
+                expected_height = int(self.chart_height * 0.4)
+                expected_size = expected_width * expected_height * 4  # 4 bytes per pixel for RGBA
+                
+                # Check if buffer size matches expected size
+                if len(buf) == expected_size:
+                    chart_surface = pygame.image.frombuffer(buf, (expected_width, expected_height), "RGBA")
+                    self.screen.blit(chart_surface, (int(self.sim_width + 20), 180))
+                else:
+                    # Fallback: draw a simple text message instead of the chart
+                    chart_text = self.font.render("Chart unavailable", True, (100, 100, 100))
+                    self.screen.blit(chart_text, (int(self.sim_width + 20), 200))
+            except Exception as e:
+                # Fallback: draw error message
+                error_text = self.font.render(f"Chart error: {str(e)[:30]}", True, (200, 0, 0))
+                self.screen.blit(error_text, (int(self.sim_width + 20), 200))
     
     def draw_environment(self):
         """Draw the satellite environment."""
