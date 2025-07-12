@@ -62,7 +62,6 @@ class SatelliteSwarmEnv(gym.Env):
     def _get_observation(self):
         positions = np.array([sat.getPosition() for sat in self.satellites])
         velocities = np.array([sat.velocity for sat in self.satellites])
-        comm_matrix = self._calculate_communication_matrix()
         
         return {
             'positions': positions.astype(np.float32),
