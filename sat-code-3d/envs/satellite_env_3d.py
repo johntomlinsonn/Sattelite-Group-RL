@@ -112,7 +112,7 @@ ax.plot(orbital_positions[:, 0], orbital_positions[:, 1], orbital_positions[:, 2
         'r--', linewidth=1, alpha=0.5, label='Complete Orbit Path')
 
 # Initialize moving elements
-satellite_point = ax.scatter([], [], [], color='red', s=100, label='Satellite Position')
+satellite_line, = ax.plot([], [], [], 'ro', markersize=8, label='Satellite Position')  # Changed from scatter to plot
 trail_line, = ax.plot([], [], [], 'r-', linewidth=2, alpha=0.7, label='Orbit Trail')
 velocity_arrow = None
 
@@ -126,8 +126,8 @@ def update_satellite(frame):
     # Get current position
     current_pos = orbital_positions[frame]
     
-    # Update satellite position
-    satellite_point._offsets3d = ([current_pos[0]], [current_pos[1]], [current_pos[2]])
+    # Update satellite position using plot instead of scatter
+    satellite_line.set_data_3d([current_pos[0]], [current_pos[1]], [current_pos[2]])
     
     # Add to trail
     trail_points.append(current_pos)
@@ -159,7 +159,7 @@ def update_satellite(frame):
     current_time = frame * period_hours / num_points
     ax.set_title(f'Satellite Orbit Animation\nTime: {current_time:.2f} hours')
     
-    return satellite_point, trail_line
+    return satellite_line, trail_line
 
 
 # Set labels and title
