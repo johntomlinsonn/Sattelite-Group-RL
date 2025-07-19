@@ -1,0 +1,13 @@
+# Environment configuration
+environment:
+  num_satellites: 10
+  earth_radius: 6371  # km
+  orbit_height: 550   # km
+  coverage_radius: 20 # km
+  max_timesteps: 1000
+
+# Simulation parameters
+simulation:
+  timestep: 0.1  # seconds
+  use_pybullet: true
+  render_mode: "human"
