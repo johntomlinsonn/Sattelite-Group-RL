@@ -71,8 +71,8 @@ except:
     print("Using standard CPU rendering")
 
 # Plot Earth as a sphere (this stays static) - highly optimized version
-u_sphere = np.linspace(0, 2 * np.pi, 25)  # Reduced further for max performance
-v_sphere = np.linspace(0, np.pi, 25)      # Reduced further for max performance
+u_sphere = np.linspace(0, 2 * np.pi, 15)  # Reduced further for max performance
+v_sphere = np.linspace(0, np.pi, 15)      # Reduced further for max performance
 earth_radius = Earth.R.to(u.km).value
 x_earth = earth_radius * np.outer(np.cos(u_sphere), np.sin(v_sphere))
 y_earth = earth_radius * np.outer(np.sin(u_sphere), np.sin(v_sphere))
