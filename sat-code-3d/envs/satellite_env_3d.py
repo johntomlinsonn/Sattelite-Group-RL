@@ -119,9 +119,10 @@ velocity_arrow = None
 # Store trail points
 trail_points = []
 max_trail_length = 50  # Number of points to keep in trail
+last_title_update = 0  # Track when we last updated the title
 
 def update_satellite(frame):
-    global velocity_arrow, trail_points
+    global velocity_arrow, trail_points, last_title_update
     
     # Get current position
     current_pos = orbital_positions[frame]
@@ -155,9 +156,11 @@ def update_satellite(frame):
                               vel_vector[0], vel_vector[1], vel_vector[2],
                               color='green', arrow_length_ratio=0.1, alpha=0.8)
     
-    # Update title with current time
-    current_time = frame * period_hours / num_points
-    ax.set_title(f'Satellite Orbit Animation\nTime: {current_time:.2f} hours')
+    # Update title less frequently for better performance (every 10 frames ≈ every ~0.16 seconds)
+    if frame % 10 == 0:
+        current_time = frame * period_hours / num_points
+        ax.set_title(f'Satellite Orbit Animation\nTime: {current_time:.2f} hours')
+        last_title_update = frame
     
     return satellite_line, trail_line
 
@@ -187,7 +190,7 @@ print("Close the plot window to continue...")
 
 # Animation with optimized settings for GPU rendering
 animation = FuncAnimation(fig, update_satellite, frames=num_points, 
-                         interval=16, blit=True, repeat=True, cache_frame_data=False)
+                         interval=16, blit=False, repeat=True, cache_frame_data=False)
 
 plt.tight_layout()
 plt.show()
