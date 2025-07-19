@@ -78,8 +78,8 @@ x_earth = earth_radius * np.outer(np.cos(u_sphere), np.sin(v_sphere))
 y_earth = earth_radius * np.outer(np.sin(u_sphere), np.sin(v_sphere))
 z_earth = earth_radius * np.outer(np.ones(np.size(u_sphere)), np.cos(v_sphere))
 
-# Use plot_surface with maximum optimization settings
-earth_surface = ax.plot_surface(x_earth, y_earth, z_earth, alpha=0.3, color='lightblue', 
+# Use plot_surface with maximum optimization settings - solid blue Earth
+earth_surface = ax.plot_surface(x_earth, y_earth, z_earth, alpha=0.7, color='lightblue', 
                                label='Earth', rasterized=True, shade=False, 
                                linewidth=0, antialiased=False)
 
